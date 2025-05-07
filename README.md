@@ -19,7 +19,31 @@ A Retrieval-Augmented Generation (RAG) system for processing unstructured data u
 - Docker and Docker Compose
 - Git
 
-### Installation
+### Quick Start with Helper Script
+
+The project includes a comprehensive setup, run, and deploy script that simplifies the process:
+
+```bash
+# Show script help
+./scripts/setup_run_deploy.sh --help
+
+# Set up the environment
+./scripts/setup_run_deploy.sh --setup
+
+# Run locally (Python + Docker for Milvus)
+./scripts/setup_run_deploy.sh --run local
+
+# Run with Docker (full containerization)
+./scripts/setup_run_deploy.sh --run docker
+
+# Deploy to production
+./scripts/setup_run_deploy.sh --deploy
+
+# Clean the environment
+./scripts/setup_run_deploy.sh --clean
+```
+
+### Manual Installation
 
 1. Clone the repository:
 ```bash
@@ -95,6 +119,34 @@ The system follows a modular architecture:
 2. **Processing**: Cleans text, chunks content, and generates embeddings
 3. **Retrieval**: Searches for relevant chunks using vector similarity
 4. **Generation**: Creates responses based on retrieved information
+
+## Utility Scripts
+
+The project includes several utility scripts to help with setup, development, and evaluation:
+
+### Setup and Deployment
+
+- **setup_run_deploy.sh**: All-in-one script for setting up, running, and deploying the system
+- **setup_milvus.py**: Initialize and configure the Milvus vector database
+- **init.py**: Create necessary directories and initialize the project
+
+### Development and Testing
+
+- **benchmark.py**: Performance testing tool for measuring ingestion and query speeds
+  ```bash
+  # Example: Benchmark document ingestion
+  python scripts/benchmark.py --mode ingestion --files data/sample.pdf
+  
+  # Example: Benchmark query performance
+  python scripts/benchmark.py --mode retrieval --queries "What is RAG?"
+  ```
+
+## Examples
+
+The `examples` directory contains Jupyter notebooks demonstrating how to use the system:
+
+- **basic_rag.ipynb**: Basic usage of the RAG system
+- **advanced_rag.ipynb**: Advanced features and customization
 
 ## Development
 
