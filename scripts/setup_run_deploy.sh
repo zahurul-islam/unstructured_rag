@@ -22,18 +22,19 @@ show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -h, --help                 Show this help message"
-    echo "  -s, --setup                Set up the environment (Python venv, dependencies)"
-    echo "  -r, --run [local|docker]   Run the system (locally or with docker)"
-    echo "  -d, --deploy               Deploy the system"
-    echo "  -c, --clean                Clean the environment"
+    echo "  -h, --help                       Show this help message"
+    echo "  -s, --setup                      Set up the environment (Python venv, dependencies)"
+    echo "  -r, --run [local|docker|webui]   Run the system (locally, with docker, or just the webui)"
+    echo "  -d, --deploy                     Deploy the system"
+    echo "  -c, --clean                      Clean the environment"
     echo ""
     echo "Examples:"
-    echo "  $0 --setup                 # Set up the environment"
-    echo "  $0 --run local             # Run locally"
-    echo "  $0 --run docker            # Run with Docker"
-    echo "  $0 --deploy                # Deploy to production"
-    echo "  $0 --clean                 # Clean the environment"
+    echo "  $0 --setup                       # Set up the environment"
+    echo "  $0 --run local                   # Run locally"
+    echo "  $0 --run docker                  # Run with Docker"
+    echo "  $0 --run webui                   # Run only the Web UI"
+    echo "  $0 --deploy                      # Deploy to production"
+    echo "  $0 --clean                       # Clean the environment"
     echo ""
 }
 
@@ -326,6 +327,9 @@ while [ $# -gt 0 ]; do
                     ;;
                 docker)
                     run_docker
+                    ;;
+                webui)
+                    "$ROOT_DIR/scripts/run_webui.sh"
                     ;;
                 *)
                     log "ERROR" "Unknown run mode: $2"

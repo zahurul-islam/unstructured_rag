@@ -107,6 +107,24 @@ services:
       - milvus_network
     restart: always
 
+  # Web UI service
+  webui:
+    build:
+      context: ../webui
+      dockerfile: Dockerfile
+    container_name: rag-webui
+    depends_on:
+      - rag-api
+    environment:
+      - RAG_API_URL=http://rag-api:8000
+      - HOST=0.0.0.0
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    networks:
+      - milvus_network
+    restart: always
+
 networks:
   milvus_network:
     driver: bridge

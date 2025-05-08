@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG System | Unstructured Data</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <i class="fas fa-brain"></i>
+                <h1>Unstructured RAG</h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active" data-page="home">Home</a></li>
+                    <li><a href="#" data-page="documents">Documents</a></li>
+                    <li><a href="#" data-page="about">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Home Page -->
+        <section id="home" class="page active">
+            <div class="container">
+                <div class="hero">
+                    <h2>Intelligent Document Understanding</h2>
+                    <p>Upload and query your unstructured documents using DeepSeek-R1-Zero and Milvus vector database.</p>
+                    <div class="cta-buttons">
+                        <button class="btn primary" id="upload-btn">Upload Documents</button>
+                        <button class="btn secondary" id="query-btn">Ask Questions</button>
+                    </div>
+                </div>
+
+                <div class="features">
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-file-alt"></i></div>
+                        <h3>Multiple Document Types</h3>
+                        <p>Support for PDF, Word, Text, HTML, and more file formats.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-database"></i></div>
+                        <h3>Vector Database</h3>
+                        <p>Powered by Milvus for fast similarity search.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon"><i class="fas fa-robot"></i></div>
+                        <h3>AI-Powered Responses</h3>
+                        <p>DeepSeek-R1-Zero generates accurate answers from your documents.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Documents Page -->
+        <section id="documents" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h2>Document Management</h2>
+                    <button class="btn primary" id="upload-document-btn">Upload New</button>
+                </div>
+
+                <div class="document-list-container">
+                    <div class="loading" id="document-loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading documents...</p>
+                    </div>
+                    <div class="error hidden" id="document-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Error loading documents.</p>
+                        <button class="btn secondary" id="retry-documents-btn">Retry</button>
+                    </div>
+                    <table class="document-table hidden" id="document-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="document-list">
+                            <!-- Dynamic content will be inserted here -->
+                        </tbody>
+                    </table>
+                    <div class="empty-state hidden" id="document-empty">
+                        <i class="fas fa-file-upload"></i>
+                        <p>No documents uploaded yet</p>
+                        <button class="btn secondary" id="empty-upload-btn">Upload Your First Document</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Page -->
+        <section id="about" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h2>About This System</h2>
+                </div>
+                <div class="about-content">
+                    <div class="about-section">
+                        <h3>RAG System Architecture</h3>
+                        <p>This Retrieval-Augmented Generation (RAG) system is designed to process unstructured data, making it searchable and queryable using natural language.</p>
+                        <div class="architecture-diagram">
+                            <img src="/static/img/architecture.svg" alt="RAG System Architecture">
+                        </div>
+                    </div>
+                    <div class="about-section">
+                        <h3>Technology Stack</h3>
+                        <ul class="tech-stack">
+                            <li><span class="tech-label">LLM:</span> DeepSeek-R1-Zero</li>
+                            <li><span class="tech-label">Vector Database:</span> Milvus</li>
+                            <li><span class="tech-label">Framework:</span> LangChain</li>
+                            <li><span class="tech-label">Embedding Model:</span> Sentence Transformers</li>
+                            <li><span class="tech-label">Backend:</span> Python FastAPI</li>
+                            <li><span class="tech-label">Frontend:</span> HTML/CSS/JavaScript</li>
+                        </ul>
+                    </div>
+                    <div class="about-section">
+                        <h3>How It Works</h3>
+                        <ol class="how-it-works">
+                            <li>Upload your documents (PDFs, Word files, HTML, etc.)</li>
+                            <li>The system extracts text and splits it into smaller chunks</li>
+                            <li>Each chunk is converted into a vector embedding</li>
+                            <li>Embeddings are stored in Milvus vector database</li>
+                            <li>When you ask a question, your query is also converted to an embedding</li>
+                            <li>The system finds the most relevant document chunks</li>
+                            <li>DeepSeek-R1-Zero generates an answer based on the retrieved context</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Query Interface -->
+        <div class="query-interface" id="query-interface">
+            <div class="query-header">
+                <h3>Ask Questions About Your Documents</h3>
+                <button class="close-btn" id="close-query-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="query-container">
+                <div class="conversation-container" id="conversation-container">
+                    <!-- Conversation will be inserted here -->
+                    <div class="welcome-message">
+                        <h4>Welcome to the RAG Query Interface</h4>
+                        <p>Ask any questions about your uploaded documents!</p>
+                    </div>
+                </div>
+                <div class="query-input-container">
+                    <textarea id="query-input" placeholder="Type your question here..." rows="2"></textarea>
+                    <button class="send-btn" id="send-query-btn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Modal -->
+        <div class="modal" id="upload-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Upload Documents</h3>
+                    <button class="close-btn" id="close-upload-btn"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <p>Select a document to upload. Supported formats: PDF, DOCX, HTML, TXT, CSV, JSON</p>
+                    <div class="upload-area" id="upload-area">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag & drop files here or click to select</p>
+                        <input type="file" id="file-input" accept=".pdf,.docx,.doc,.html,.htm,.txt,.csv,.json,.rtf,.md" style="display: none;">
+                    </div>
+                    <div class="selected-file hidden" id="selected-file">
+                        <i class="fas fa-file"></i>
+                        <span id="file-name">filename.pdf</span>
+                        <button class="remove-btn" id="remove-file-btn"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="upload-progress hidden" id="upload-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <span id="progress-text">Uploading... 0%</span>
+                    </div>
+                    <div class="upload-success hidden" id="upload-success">
+                        <i class="fas fa-check-circle"></i>
+                        <p>Upload successful!</p>
+                    </div>
+                    <div class="upload-error hidden" id="upload-error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p id="error-message">Upload failed. Please try again.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn secondary" id="cancel-upload-btn">Cancel</button>
+                    <button class="btn primary" id="confirm-upload-btn" disabled>Upload</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay -->
+        <div class="overlay" id="overlay"></div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Unstructured RAG System. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
