@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RAG System | Unstructured Data</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/upload.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -148,7 +149,7 @@
                 <h3>Ask Questions About Your Documents</h3>
                 <button class="close-btn" id="close-query-btn"><i class="fas fa-times"></i></button>
             </div>
-            <div class="query-container">
+            <div class="query-container" id="query-container">
                 <div class="conversation-container" id="conversation-container">
                     <!-- Conversation will be inserted here -->
                     <div class="welcome-message">
@@ -156,13 +157,16 @@
                         <p>Ask any questions about your uploaded documents!</p>
                     </div>
                 </div>
-                <div class="query-input-container">
-                    <textarea id="query-input" placeholder="Type your question here..." rows="2"></textarea>
-                    <button class="send-btn" id="send-query-btn">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
+                <form id="query-form" onsubmit="return false;">
+                    <div class="query-input-container">
+                        <textarea id="query-input" placeholder="Type your question here..." rows="2"></textarea>
+                        <button type="button" class="send-btn" id="send-query-btn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
             </div>
+        </div></div>
         </div>
 
         <!-- Upload Modal -->
@@ -173,16 +177,25 @@
                     <button class="close-btn" id="close-upload-btn"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="modal-body">
-                    <p>Select a document to upload. Supported formats: PDF, DOCX, HTML, TXT, CSV, JSON</p>
+                    <p>Select documents to upload. Supported formats: PDF, DOCX, HTML, TXT, CSV, JSON</p>
+                    <div class="upload-tabs">
+                        <button id="tab-files" class="tab-btn active">Files</button>
+                        <button id="tab-directory" class="tab-btn">Directory</button>
+                    </div>
                     <div class="upload-area" id="upload-area">
                         <i class="fas fa-cloud-upload-alt"></i>
                         <p>Drag & drop files here or click to select</p>
-                        <input type="file" id="file-input" accept=".pdf,.docx,.doc,.html,.htm,.txt,.csv,.json,.rtf,.md" style="display: none;">
+                        <input type="file" id="file-input" accept=".pdf,.docx,.doc,.html,.htm,.txt,.csv,.json,.rtf,.md" multiple style="display: none;">
+                        <input type="file" id="directory-input" webkitdirectory directory multiple style="display: none;">
                     </div>
-                    <div class="selected-file hidden" id="selected-file">
-                        <i class="fas fa-file"></i>
-                        <span id="file-name">filename.pdf</span>
-                        <button class="remove-btn" id="remove-file-btn"><i class="fas fa-times"></i></button>
+                    <div class="selected-files hidden" id="selected-files">
+                        <div class="selected-files-header">
+                            <span id="files-count">0 files selected</span>
+                            <button class="remove-btn" id="remove-all-files-btn"><i class="fas fa-times"></i> Clear All</button>
+                        </div>
+                        <div class="selected-files-list" id="files-list">
+                            <!-- Files will be listed here -->
+                        </div>
                     </div>
                     <div class="upload-progress hidden" id="upload-progress">
                         <div class="progress-bar">
@@ -217,5 +230,6 @@
     </footer>
 
     <script src="/static/js/main.js"></script>
+    <script src="/static/js/upload.js"></script>
 </body>
 </html>

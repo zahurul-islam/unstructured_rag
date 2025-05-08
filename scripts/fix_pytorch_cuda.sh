@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to fix PyTorch CUDA installation
+# Script to fix PyTorch CUDA support
 
 set -e  # Exit on error
 
@@ -30,32 +30,60 @@ log() {
     echo -e "${color}[$level] $message${NC}"
 }
 
+# Check if virtual environment exists
+if [ ! -d "$ROOT_DIR/venv" ]; then
+    log "ERROR" "Virtual environment not found at: $ROOT_DIR/venv"
+    log "INFO" "Creating a new virtual environment..."
+    python3 -m venv venv
+fi
+
 # Activate virtual environment
-log "INFO" "Activating virtual environment..."
 source "$ROOT_DIR/venv/bin/activate"
 
+# Check for NVIDIA GPU
+if ! command -v nvidia-smi &> /dev/null; then
+    log "ERROR" "NVIDIA GPU not detected. This script requires an NVIDIA GPU."
+    exit 1
+fi
+
+# Get CUDA version
+CUDA_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | cut -d. -f1,2 | sed 's/\.//')
+log "INFO" "Detected CUDA version from driver: $CUDA_VERSION"
+
+# Select PyTorch installation command based on CUDA version
+if [ "$CUDA_VERSION" -ge "120" ]; then
+    PYTORCH_INSTALL="pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121"
+    log "INFO" "Using CUDA 12.1 PyTorch packages"
+elif [ "$CUDA_VERSION" -ge "118" ]; then
+    PYTORCH_INSTALL="pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
+    log "INFO" "Using CUDA 11.8 PyTorch packages"
+elif [ "$CUDA_VERSION" -ge "117" ]; then
+    PYTORCH_INSTALL="pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
+    log "INFO" "Using CUDA 11.7 PyTorch packages"
+elif [ "$CUDA_VERSION" -ge "116" ]; then
+    PYTORCH_INSTALL="pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu116"
+    log "INFO" "Using CUDA 11.6 PyTorch packages"
+else
+    log "WARNING" "Could not determine a matching PyTorch version for your CUDA version"
+    log "INFO" "Using latest CUDA 11.8 PyTorch packages"
+    PYTORCH_INSTALL="pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
+fi
+
 # Uninstall current PyTorch
-log "INFO" "Uninstalling current PyTorch version..."
+log "INFO" "Uninstalling current PyTorch installation..."
 pip uninstall -y torch torchvision torchaudio
 
 # Install PyTorch with CUDA support
 log "INFO" "Installing PyTorch with CUDA support..."
-pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+eval $PYTORCH_INSTALL
+
+# Install other dependencies
+log "INFO" "Installing other dependencies..."
+pip install -r requirements.txt
 
 # Verify installation
-log "INFO" "Verifying PyTorch CUDA installation..."
-python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda if torch.cuda.is_available() else \"Not available\"}'); print(f'GPU device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+log "INFO" "Verifying PyTorch CUDA support..."
+python3 -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('CUDA version:', torch.version.cuda); print('GPU device count:', torch.cuda.device_count()); print('Current device:', torch.cuda.current_device()); print('Device name:', torch.cuda.get_device_name(0))"
 
-if python -c "import torch; import sys; sys.exit(0 if torch.cuda.is_available() else 1)"; then
-    log "INFO" "PyTorch CUDA support verified successfully!"
-    
-    # Install other GPU dependencies
-    log "INFO" "Installing additional GPU dependencies..."
-    pip install -U bitsandbytes accelerate
-    
-    log "INFO" "GPU setup completed. Your RTX 4090 is ready to use with the RAG system!"
-else
-    log "ERROR" "PyTorch CUDA support installation failed."
-    log "INFO" "Please try installing manually with:"
-    log "INFO" "source venv/bin/activate && pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121"
-fi
+log "INFO" "PyTorch installation completed."
+log "INFO" "You can now run the application with CUDA support."

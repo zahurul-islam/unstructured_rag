@@ -23,11 +23,27 @@ def load_pdf(file_path: str) -> Tuple[str, Dict[str, Any]]:
             - Extracted text content (str)
             - Document metadata (Dict[str, Any])
     """
+    # First try OCR for the best results with all types of PDFs
+    try:
+        logger.info(f"Trying OCR extraction first for PDF: {file_path}")
+        text, metadata = load_pdf_with_ocr(file_path)
+        
+        # If we got meaningful text, return it
+        if text and len(text.strip()) > 100:  # Arbitrary threshold for meaningful text
+            logger.info("OCR extraction successful")
+            return text, metadata
+        else:
+            logger.warning("OCR extraction yielded insufficient text, trying other methods")
+    except Exception as e:
+        logger.warning(f"OCR extraction failed: {str(e)}, trying other methods")
+    
+    # Try with unstructured-io
     try:
         # Use langchain's PDF loader which internally uses unstructured-io
         from langchain_community.document_loaders import UnstructuredPDFLoader
         
         # Load the PDF document
+        logger.info("Trying UnstructuredPDFLoader")
         loader = UnstructuredPDFLoader(file_path)
         documents = loader.load()
         
@@ -40,16 +56,22 @@ def load_pdf(file_path: str) -> Tuple[str, Dict[str, Any]]:
             "source_type": "pdf"
         }
         
-        return text, metadata
+        # Check if we got meaningful text
+        if text and len(text.strip()) > 100:
+            logger.info("UnstructuredPDFLoader extraction successful")
+            return text, metadata
+        else:
+            logger.warning("UnstructuredPDFLoader yielded insufficient text, trying PyPDF")
     
     except ImportError:
         logger.warning("UnstructuredPDFLoader not available. Falling back to PyPDF.")
-        return load_pdf_with_pypdf(file_path)
     
     except Exception as e:
         logger.error(f"Error loading PDF with UnstructuredPDFLoader: {str(e)}")
         logger.info("Falling back to PyPDF")
-        return load_pdf_with_pypdf(file_path)
+    
+    # Try with PyPDF as a last resort for text-based PDFs
+    return load_pdf_with_pypdf(file_path)
 
 
 def load_pdf_with_pypdf(file_path: str) -> Tuple[str, Dict[str, Any]]:
@@ -121,14 +143,23 @@ def load_pdf_with_ocr(file_path: str) -> Tuple[str, Dict[str, Any]]:
             - Document metadata (Dict[str, Any])
     """
     try:
+        # Try using enhanced OCR
+        from rag.data_ingestion.ocr_pdf_loader import load_pdf_with_advanced_ocr
+        logger.info("Using advanced OCR for PDF extraction")
+        return load_pdf_with_advanced_ocr(file_path, dpi=300)
+        
+    except ImportError:
+        logger.warning("Advanced OCR module not available, falling back to standard OCR")
+    
+    try:
         from pdf2image import convert_from_path
         import pytesseract
         from PIL import Image
         
         # Create a temporary directory for the images
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Convert PDF to images
-            images = convert_from_path(file_path)
+            # Convert PDF to images with increased DPI
+            images = convert_from_path(file_path, dpi=200)  # Higher DPI for better quality
             
             # Extract text from each page
             text = ""
@@ -137,9 +168,19 @@ def load_pdf_with_ocr(file_path: str) -> Tuple[str, Dict[str, Any]]:
                 image_path = os.path.join(temp_dir, f"page_{i}.png")
                 image.save(image_path, "PNG")
                 
-                # Extract text from the image
-                page_text = pytesseract.image_to_string(Image.open(image_path))
-                text += page_text + " "
+                # Extract text from the image with improved settings
+                try:
+                    # Try with German and English language models first
+                    page_text = pytesseract.image_to_string(
+                        Image.open(image_path),
+                        lang='deu+eng',  # Use both German and English language models
+                        config='--psm 1'  # Auto-detect page segmentation
+                    )
+                except:
+                    # Fall back to default if language pack is not installed
+                    page_text = pytesseract.image_to_string(Image.open(image_path))
+                
+                text += page_text + "\n\n"  # Use double newline for better paragraph separation
             
             # Create PDF-specific metadata
             metadata = {

@@ -1,14 +1,17 @@
 # Unstructured RAG System
 
-A Retrieval-Augmented Generation (RAG) system for processing unstructured data using DeepSeek-R1-Zero, Milvus, and LangChain.
+A Retrieval-Augmented Generation (RAG) system for processing unstructured data using Milvus vector database and various LLM models. The system provides a user-friendly web interface for document management and natural language querying.
 
 ## Features
 
 - Process various unstructured data types (PDF, text, HTML, Word, etc.)
 - Vector storage using Milvus database
-- Text generation with DeepSeek-R1-Zero model
-- Flexible chunking strategies
+- Text generation with multiple LLM options (local models or API-based)
+- Flexible chunking strategies for optimal document processing
 - RESTful API with FastAPI
+- User-friendly web interface
+- Automatic source attribution in responses
+- Natural language responses with comprehensive information
 - Docker support
 
 ## Setup
@@ -111,6 +114,28 @@ curl -X POST "http://localhost:8000/query" \
 - `POST /query`: Perform RAG query
 - `GET /health`: Check system health
 
+## Web Interface
+
+The system includes a user-friendly web interface that allows you to:
+
+- Upload and manage documents through a simple drag-and-drop interface
+- View all uploaded documents with metadata
+- Delete documents when no longer needed
+- Ask natural language questions about your documents
+- View comprehensive answers with source attribution
+- Navigate between different sections of the application
+
+### Running the Web UI
+
+```bash
+# Start the Web UI server
+cd webui
+python server.py
+
+# Access the Web UI in your browser
+# Default URL: http://localhost:8083
+```
+
 ## Architecture
 
 The system follows a modular architecture:
@@ -118,7 +143,16 @@ The system follows a modular architecture:
 1. **Data Ingestion**: Processes various file types and extracts text
 2. **Processing**: Cleans text, chunks content, and generates embeddings
 3. **Retrieval**: Searches for relevant chunks using vector similarity
-4. **Generation**: Creates responses based on retrieved information
+4. **Generation**: Creates natural language responses based on retrieved information
+5. **Web Interface**: Provides a user-friendly interface for document management and querying
+
+### System Components
+
+- **FastAPI Backend**: Handles document processing, vector storage, and query processing
+- **Milvus Vector Database**: Stores document embeddings for efficient similarity search
+- **LLM Integration**: Supports both local models and API-based models for text generation
+- **Flask Web Server**: Serves the web interface and communicates with the backend API
+- **Document Processors**: Handle various document formats (PDF, text, HTML, etc.)
 
 ## Utility Scripts
 
@@ -136,7 +170,7 @@ The project includes several utility scripts to help with setup, development, an
   ```bash
   # Example: Benchmark document ingestion
   python scripts/benchmark.py --mode ingestion --files data/sample.pdf
-  
+
   # Example: Benchmark query performance
   python scripts/benchmark.py --mode retrieval --queries "What is RAG?"
   ```

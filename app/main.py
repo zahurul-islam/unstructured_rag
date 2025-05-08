@@ -6,6 +6,12 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+import sys
+import os
+
+# Add the parent directory to the path to make imports work
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.config import config
 
 # Import routes
