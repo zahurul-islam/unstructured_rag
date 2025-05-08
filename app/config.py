@@ -40,7 +40,9 @@ class LLMConfig(BaseModel):
     """LLM configuration for DeepSeek model."""
 
     api_key: Optional[str] = Field(default=os.getenv("DEEPSEEK_API_KEY"))
-    model_name: str = Field(default="deepseek/deepseek-r1-zero:free")
+    model_name: str = Field(default=os.getenv("LLM_MODEL", "deepseek/deepseek-r1-zero:free"))
+    use_gpu: bool = Field(default=os.getenv("USE_GPU", "true").lower() == "true")
+    gpu_device: int = Field(default=int(os.getenv("GPU_DEVICE", 0)))
     temperature: float = Field(default=float(os.getenv("LLM_TEMPERATURE", 0.1)))
     max_tokens: int = Field(default=int(os.getenv("LLM_MAX_TOKENS", 4096)))
     top_p: float = Field(default=float(os.getenv("LLM_TOP_P", 0.95)))

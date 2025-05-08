@@ -59,6 +59,29 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to check for GPU availability
+check_gpu() {
+    log "INFO" "Checking for GPU availability..."
+    
+    if command_exists nvidia-smi; then
+        # Get GPU information
+        GPU_INFO=$(nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader)
+        log "INFO" "NVIDIA GPU detected: $GPU_INFO"
+        
+        # Check for CUDA availability
+        if python3 -c "import torch; print(torch.cuda.is_available())" 2>/dev/null | grep -q "True"; then
+            log "INFO" "CUDA is available with PyTorch. GPU acceleration will be enabled."
+            return 0
+        else
+            log "WARNING" "NVIDIA GPU detected but CUDA is not available with PyTorch. Install PyTorch with CUDA support for GPU acceleration."
+            return 1
+        fi
+    else
+        log "WARNING" "No NVIDIA GPU detected. The system will run on CPU."
+        return 1
+    fi
+}
+
 # Function to set up the environment
 setup_environment() {
     log "INFO" "Setting up the environment..."
@@ -84,12 +107,34 @@ setup_environment() {
     # Install dependencies
     log "INFO" "Installing dependencies..."
     pip install --upgrade pip
+    
+    # Check for GPU to install the right PyTorch version
+    if check_gpu; then
+        log "INFO" "Installing PyTorch with CUDA support..."
+        pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu121
+    else
+        log "INFO" "Installing CPU-only PyTorch..."
+        pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+    fi
+    
+    # Install the rest of the dependencies
     pip install -r "$ROOT_DIR/requirements.txt"
     
     # Create .env file if it doesn't exist
     if [ ! -f "$ROOT_DIR/.env" ]; then
         log "INFO" "Creating .env file..."
         cp "$ROOT_DIR/.env.example" "$ROOT_DIR/.env"
+        
+        # Update .env with GPU settings if available
+        if check_gpu; then
+            echo "USE_GPU=true" >> "$ROOT_DIR/.env"
+            echo "GPU_DEVICE=0" >> "$ROOT_DIR/.env"
+            echo "LLM_MODE=local" >> "$ROOT_DIR/.env"
+        else
+            echo "USE_GPU=false" >> "$ROOT_DIR/.env"
+            echo "LLM_MODE=api" >> "$ROOT_DIR/.env"
+        fi
+        
         log "WARNING" "Please update the .env file with your API keys and configuration."
     fi
     
@@ -164,6 +209,9 @@ run_local() {
         log "WARNING" "Milvus setup encountered issues but we'll try to continue."
     }
     
+    # Check for GPU
+    check_gpu
+    
     # Start the API
     log "INFO" "Starting the API..."
     cd "$ROOT_DIR"
@@ -178,6 +226,16 @@ run_docker() {
     if [ ! -f "$ROOT_DIR/.env" ]; then
         log "ERROR" ".env file not found. Please run setup first."
         exit 1
+    fi
+    
+    # Check for NVIDIA Docker support
+    if command_exists nvidia-smi && command_exists docker; then
+        # Check if nvidia-docker is available
+        if docker info | grep -q "Runtimes:.*nvidia"; then
+            log "INFO" "NVIDIA Docker runtime detected. GPU will be available in containers."
+        else
+            log "WARNING" "NVIDIA Docker runtime not detected. Install nvidia-docker2 for GPU support in containers."
+        fi
     fi
     
     # Start the system with Docker Compose
@@ -199,6 +257,7 @@ run_docker() {
     
     log "INFO" "System started successfully. API is available at http://localhost:8000"
     log "INFO" "API documentation is available at http://localhost:8000/docs"
+    log "INFO" "Web UI is available at http://localhost:8081"
 }
 
 # Function to stop the system
@@ -258,6 +317,9 @@ deploy_system() {
         exit 1
     fi
     
+    # Check for GPU support
+    check_gpu
+    
     # Build Docker image
     log "INFO" "Building Docker image..."
     docker-compose -f "$ROOT_DIR/docker/docker-compose.yml" build
@@ -279,6 +341,25 @@ deploy_system() {
             if ! ssh -q -o BatchMode=yes -o ConnectTimeout=5 "$server_address" exit; then
                 log "ERROR" "Cannot connect to server. Please check your SSH key and server address."
                 exit 1
+            fi
+            
+            # Check for GPU on remote server
+            log "INFO" "Checking for GPU on remote server..."
+            if ssh "$server_address" "command -v nvidia-smi && nvidia-smi"; then
+                log "INFO" "GPU detected on remote server."
+                
+                # Check for Docker and Docker Compose
+                if ! ssh "$server_address" "command -v docker && command -v docker-compose"; then
+                    log "ERROR" "Docker and/or Docker Compose not found on remote server."
+                    exit 1
+                fi
+                
+                # Check for NVIDIA Docker runtime
+                if ! ssh "$server_address" "docker info | grep -q 'Runtimes:.*nvidia'"; then
+                    log "WARNING" "NVIDIA Docker runtime not detected on remote server. GPU acceleration will not work."
+                fi
+            else
+                log "WARNING" "No GPU detected on remote server. The system will run on CPU."
             fi
             
             # Copy files to server

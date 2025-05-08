@@ -16,6 +16,10 @@ faiss-cpu>=1.7.4
 
 # Embeddings
 sentence-transformers>=2.2.2
+torch>=2.2.0
+accelerate>=0.33.0
+bitsandbytes>=0.42.0
+transformers>=4.39.3
 
 # Document Processing
 unstructured>=0.11.0

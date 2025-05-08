@@ -5,6 +5,7 @@ LLM integration module for DeepSeek-R1-Zero.
 import logging
 import os
 from typing import Dict, List, Any, Optional
+import time
 
 from app.config import config
 
@@ -21,6 +22,8 @@ class LLM:
         self,
         model_name: str = None,
         api_key: str = None,
+        use_gpu: bool = None,
+        gpu_device: int = None,
         temperature: float = None,
         max_tokens: int = None,
         top_p: float = None,
@@ -31,32 +34,44 @@ class LLM:
         Args:
             model_name: Name of the model to use
             api_key: DeepSeek API key
+            use_gpu: Whether to use GPU (if available)
+            gpu_device: GPU device ID to use
             temperature: Temperature for text generation
             max_tokens: Maximum number of tokens to generate
             top_p: Top-p sampling parameter
         """
         self.model_name = model_name or config.llm.model_name
         self.api_key = api_key or config.llm.api_key
+        self.use_gpu = use_gpu if use_gpu is not None else config.llm.use_gpu
+        self.gpu_device = gpu_device if gpu_device is not None else config.llm.gpu_device
         self.temperature = temperature or config.llm.temperature
         self.max_tokens = max_tokens or config.llm.max_tokens
         self.top_p = top_p or config.llm.top_p
         
-        # Check if API key is provided
-        if not self.api_key:
-            logger.warning("DeepSeek API key not provided")
+        # Initialize model based on configuration
+        self.model = None
+        self.tokenizer = None
+        self.use_api = self.api_key is not None and "api" in os.environ.get("LLM_MODE", "").lower()
         
-        # Initialize LangChain
-        self._init_langchain()
+        # Initialize
+        self._init_model()
     
-    def _init_langchain(self):
-        """Initialize LangChain with the DeepSeek model."""
+    def _init_model(self):
+        """Initialize the LLM based on configuration."""
+        if self.use_api:
+            # Use API-based model
+            self._init_api_model()
+        else:
+            # Use local model with transformers
+            self._init_local_model()
+    
+    def _init_api_model(self):
+        """Initialize API-based model with LangChain."""
         try:
             from langchain_deepseek import DeepSeekChat
-            from langchain.chains import LLMChain
-            from langchain.prompts import PromptTemplate
             
             # Initialize DeepSeekChat
-            self.llm = DeepSeekChat(
+            self.api_model = DeepSeekChat(
                 model=self.model_name,
                 deepseek_api_key=self.api_key,
                 temperature=self.temperature,
@@ -64,11 +79,72 @@ class LLM:
                 top_p=self.top_p,
             )
             
-            logger.info(f"Initialized DeepSeek LLM: {self.model_name}")
+            logger.info(f"Initialized DeepSeek API LLM: {self.model_name}")
         
         except Exception as e:
-            logger.error(f"Error initializing LLM: {str(e)}")
-            self.llm = None
+            logger.error(f"Error initializing API model: {str(e)}")
+            self.api_model = None
+    
+    def _init_local_model(self):
+        """Initialize local model with transformers."""
+        try:
+            import torch
+            from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+            
+            # Check if GPU is available
+            if self.use_gpu and torch.cuda.is_available():
+                device = f"cuda:{self.gpu_device}"
+                logger.info(f"Initializing model on GPU: {torch.cuda.get_device_name(self.gpu_device)}")
+                
+                # Setup quantization config for large models
+                if "deepseek" in self.model_name.lower() or "mistral" in self.model_name.lower():
+                    bnb_config = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_use_double_quant=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16
+                    )
+                    
+                    # Load tokenizer and model
+                    self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        self.model_name,
+                        device_map=device,
+                        quantization_config=bnb_config,
+                        trust_remote_code=True
+                    )
+                else:
+                    # For smaller models, load without quantization
+                    self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        self.model_name,
+                        device_map=device,
+                        torch_dtype=torch.float16,
+                        trust_remote_code=True
+                    )
+            else:
+                # CPU fallback
+                device = "cpu"
+                logger.info(f"GPU not available or disabled, initializing model on CPU")
+                
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    self.model_name,
+                    trust_remote_code=True
+                )
+            
+            # Verify model is on correct device
+            if hasattr(self.model, 'device'):
+                logger.info(f"Model loaded on: {self.model.device}")
+            else:
+                logger.info(f"Model loaded with device map: {self.model.hf_device_map}")
+            
+            logger.info(f"Initialized local LLM: {self.model_name}")
+        
+        except Exception as e:
+            logger.error(f"Error initializing local model: {str(e)}")
+            self.model = None
+            self.tokenizer = None
     
     def generate(
         self,
@@ -87,24 +163,91 @@ class LLM:
         Returns:
             Generated text
         """
-        if not self.llm:
-            raise ValueError("LLM not initialized")
-        
+        if self.use_api and self.api_model:
+            return self._generate_with_api(prompt, temperature, max_tokens)
+        elif self.model and self.tokenizer:
+            return self._generate_with_local(prompt, temperature, max_tokens)
+        else:
+            raise ValueError("No LLM model initialized")
+    
+    def _generate_with_api(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Generate text using the API-based model."""
         try:
             # Override parameters if provided
             if temperature is not None or max_tokens is not None:
-                temp_llm = self.llm.bind(
+                temp_model = self.api_model.bind(
                     temperature=temperature or self.temperature,
                     max_tokens=max_tokens or self.max_tokens,
                 )
-                response = temp_llm.invoke(prompt)
+                response = temp_model.invoke(prompt)
             else:
-                response = self.llm.invoke(prompt)
+                response = self.api_model.invoke(prompt)
             
             return response
         
         except Exception as e:
-            logger.error(f"Error generating text: {str(e)}")
+            logger.error(f"Error generating text with API: {str(e)}")
+            raise
+    
+    def _generate_with_local(
+        self,
+        prompt: str,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Generate text using the local model."""
+        try:
+            import torch
+            
+            # Use provided parameters or defaults
+            temp = temperature if temperature is not None else self.temperature
+            max_new_tokens = max_tokens if max_tokens is not None else self.max_tokens
+            
+            # Tokenize the prompt
+            inputs = self.tokenizer(prompt, return_tensors="pt")
+            
+            # Move input tensors to the model's device
+            if self.use_gpu and torch.cuda.is_available():
+                inputs = {k: v.to(f"cuda:{self.gpu_device}") for k, v in inputs.items()}
+            
+            # Set generation parameters
+            generation_config = {
+                "max_new_tokens": max_new_tokens,
+                "temperature": temp,
+                "top_p": self.top_p,
+                "do_sample": temp > 0,
+                "pad_token_id": self.tokenizer.eos_token_id,
+            }
+            
+            # Generate text
+            start_time = time.time()
+            with torch.no_grad():
+                outputs = self.model.generate(**inputs, **generation_config)
+            
+            # Decode generated text
+            generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Remove the prompt from the generated text
+            # Some models already handle this, but we do it explicitly to be sure
+            if generated_text.startswith(prompt):
+                response = generated_text[len(prompt):].strip()
+            else:
+                # If we can't find the exact prompt (e.g., due to tokenization differences),
+                # just return the full output
+                response = generated_text.strip()
+            
+            generation_time = time.time() - start_time
+            logger.info(f"Generated text in {generation_time:.2f}s")
+            
+            return response
+        
+        except Exception as e:
+            logger.error(f"Error generating text with local model: {str(e)}")
             raise
     
     def generate_with_chain(
@@ -115,7 +258,7 @@ class LLM:
         max_tokens: Optional[int] = None,
     ) -> str:
         """
-        Generate text using a LangChain PromptTemplate.
+        Generate text using a template with variables.
         
         Args:
             template: Template string for the prompt
@@ -126,36 +269,18 @@ class LLM:
         Returns:
             Generated text
         """
-        if not self.llm:
-            raise ValueError("LLM not initialized")
-        
+        # Format the template with input variables
         try:
-            from langchain.prompts import PromptTemplate
-            from langchain.chains import LLMChain
+            prompt = template
+            for key, value in input_variables.items():
+                placeholder = "{" + key + "}"
+                prompt = prompt.replace(placeholder, str(value))
             
-            # Create prompt template
-            prompt_template = PromptTemplate(
-                input_variables=list(input_variables.keys()),
-                template=template,
-            )
-            
-            # Override parameters if provided
-            if temperature is not None or max_tokens is not None:
-                temp_llm = self.llm.bind(
-                    temperature=temperature or self.temperature,
-                    max_tokens=max_tokens or self.max_tokens,
-                )
-                chain = LLMChain(llm=temp_llm, prompt=prompt_template)
-            else:
-                chain = LLMChain(llm=self.llm, prompt=prompt_template)
-            
-            # Run chain
-            response = chain.run(**input_variables)
-            
-            return response
+            # Generate text with the formatted prompt
+            return self.generate(prompt, temperature, max_tokens)
         
         except Exception as e:
-            logger.error(f"Error generating text with chain: {str(e)}")
+            logger.error(f"Error generating text with template: {str(e)}")
             raise
 
 
