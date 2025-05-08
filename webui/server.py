@@ -5,6 +5,7 @@ This server proxies requests to the RAG API for easier CORS handling.
 
 import os
 import logging
+import sys
 from urllib.parse import urljoin
 import requests
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -17,17 +18,31 @@ logger = logging.getLogger(__name__)
 # Configuration
 RAG_API_URL = os.environ.get('RAG_API_URL', 'http://localhost:8000')
 HOST = os.environ.get('HOST', '0.0.0.0')
-PORT = int(os.environ.get('PORT', 8080))
+PORT = int(os.environ.get('PORT', 8081))
+
+# Debug: Print current directory and template folder
+current_dir = os.path.dirname(os.path.abspath(__file__))
+logger.info(f"Current directory: {current_dir}")
+logger.info(f"Template folder: {os.path.join(current_dir, 'templates')}")
+logger.info(f"Templates exist: {os.path.exists(os.path.join(current_dir, 'templates'))}")
+logger.info(f"Index.html exists: {os.path.exists(os.path.join(current_dir, 'templates', 'index.html'))}")
 
 # Create Flask app
-app = Flask(__name__)
+app = Flask(__name__, 
+           template_folder=os.path.join(current_dir, 'templates'),
+           static_folder=os.path.join(current_dir, 'static'))
 CORS(app)
 
 # Routes
 @app.route('/')
 def index():
     """Render the main page."""
-    return render_template('index.html')
+    try:
+        logger.info("Rendering index.html template")
+        return render_template('index.html')
+    except Exception as e:
+        logger.error(f"Error rendering index.html: {str(e)}")
+        return f"Error rendering index.html: {str(e)}", 500
 
 @app.route('/static/<path:path>')
 def send_static(path):

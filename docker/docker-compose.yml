@@ -118,9 +118,9 @@ services:
     environment:
       - RAG_API_URL=http://rag-api:8000
       - HOST=0.0.0.0
-      - PORT=8080
+      - PORT=8081
     ports:
-      - "8080:8080"
+      - "8081:8081"
     networks:
       - milvus_network
     restart: always
