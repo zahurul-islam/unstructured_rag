@@ -177,10 +177,9 @@ The project includes several utility scripts to help with setup, development, an
 
 ## Examples
 
-The `examples` directory contains Jupyter notebooks demonstrating how to use the system:
+The `examples` directory contains a Jupyter notebook demonstrating how to use the system:
 
-- **basic_rag.ipynb**: Basic usage of the RAG system
-- **advanced_rag.ipynb**: Advanced features and customization
+- **basic_rag.ipynb**: Basic usage of the RAG system with step-by-step instructions
 
 ## Development
 
