@@ -95,6 +95,52 @@ setup_environment() {
     log "INFO" "Environment setup completed successfully."
 }
 
+# Function to ensure Milvus is running properly
+ensure_milvus_running() {
+    log "INFO" "Checking Milvus..."
+    
+    # Check if Milvus containers are running
+    MILVUS_RUNNING=$(docker ps | grep milvus-standalone | wc -l)
+    ETCD_RUNNING=$(docker ps | grep milvus-etcd | wc -l)
+    MINIO_RUNNING=$(docker ps | grep milvus-minio | wc -l)
+    
+    if [ "$MILVUS_RUNNING" -eq 0 ] || [ "$ETCD_RUNNING" -eq 0 ] || [ "$MINIO_RUNNING" -eq 0 ]; then
+        log "INFO" "Starting Milvus with Docker Compose..."
+        
+        # Stop any existing containers first
+        docker-compose -f "$ROOT_DIR/docker/docker-compose.yml" down 2>/dev/null || true
+        
+        # Start Milvus and its dependencies
+        docker-compose -f "$ROOT_DIR/docker/docker-compose.yml" up -d milvus etcd minio createbuckets
+        
+        # Wait for services to be ready
+        log "INFO" "Waiting for Milvus to be ready..."
+        sleep 15
+    else
+        log "INFO" "Milvus is already running."
+    fi
+    
+    # Verify Milvus is responsive
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    MILVUS_OK=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$MILVUS_OK" = false ]; do
+        if docker exec milvus-standalone curl -s http://localhost:9091/api/v1/health >/dev/null 2>&1; then
+            MILVUS_OK=true
+            log "INFO" "Milvus is healthy."
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                log "WARNING" "Milvus is not ready yet. Waiting 10 seconds... (Attempt $RETRY_COUNT/$MAX_RETRIES)"
+                sleep 10
+            else
+                log "WARNING" "Milvus might not be fully healthy, but we'll try to proceed anyway."
+            fi
+        fi
+    done
+}
+
 # Function to run the system locally
 run_local() {
     log "INFO" "Running the system locally..."
@@ -109,15 +155,13 @@ run_local() {
     fi
     
     # Start Milvus if not running
-    log "INFO" "Checking Milvus..."
-    if ! docker ps | grep -q milvus-standalone; then
-        log "INFO" "Starting Milvus with Docker Compose..."
-        docker-compose -f "$ROOT_DIR/docker/docker-compose.yml" up -d milvus etcd minio
-    fi
+    ensure_milvus_running
     
     # Setup Milvus collection
     log "INFO" "Setting up Milvus collection..."
-    python3 "$ROOT_DIR/scripts/setup_milvus.py"
+    python3 "$ROOT_DIR/scripts/setup_milvus.py" || {
+        log "WARNING" "Milvus setup encountered issues but we'll try to continue."
+    }
     
     # Start the API
     log "INFO" "Starting the API..."
@@ -138,6 +182,19 @@ run_docker() {
     # Start the system with Docker Compose
     log "INFO" "Starting the system with Docker Compose..."
     docker-compose -f "$ROOT_DIR/docker/docker-compose.yml" up -d
+    
+    # Wait for startup
+    sleep 10
+    
+    # Check if the services are running
+    MILVUS_RUNNING=$(docker ps | grep milvus-standalone | wc -l)
+    API_RUNNING=$(docker ps | grep rag-api | wc -l)
+    
+    if [ "$MILVUS_RUNNING" -eq 0 ] || [ "$API_RUNNING" -eq 0 ]; then
+        log "ERROR" "Some services failed to start. Please check the logs:"
+        log "INFO" "Docker logs: docker-compose -f $ROOT_DIR/docker/docker-compose.yml logs"
+        exit 1
+    fi
     
     log "INFO" "System started successfully. API is available at http://localhost:8000"
     log "INFO" "API documentation is available at http://localhost:8000/docs"
@@ -174,7 +231,7 @@ clean_environment() {
     # Remove Docker volumes
     if command_exists docker; then
         log "INFO" "Removing Docker volumes..."
-        docker volume rm $(docker volume ls -q -f name=unstructured_rag_*) 2>/dev/null || true
+        docker volume rm $(docker volume ls -q -f name=docker_*) 2>/dev/null || true
     fi
     
     # Remove virtual environment
